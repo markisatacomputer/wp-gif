@@ -18,12 +18,13 @@ module.exports = class Giffer {
     this.repeat = options.repeat ? options.repeat: 0
     this.delay = options.delay ? options.delay: 200
     this.frameUrlBase = options.url ? options.url : frameUrlBase
+    this.filename = options.filename ? options.filename : 'animated'
     this.frequency = this.calcFrequency()
     this.frame = 0
     this.interval
     this.tmpDir = (process.env.tmpDir) ? process.env.tmpDir : './tmp'
     this.finishDir = (process.env.finishDir) ? process.env.finishDir : './finished'
-    this.outputName = this.finishDir+'/animated-'+moment().valueOf()+'.gif'
+    this.outputName = this.finishDir+'/'+this.filename+'_'+moment().format('M-D-YY')+'.gif'
   }
 
   init () {
