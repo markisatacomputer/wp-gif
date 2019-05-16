@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+
+  node:
+    image: node:10.15-alpine
+    restart: always
+    ports:
+      - 3030:3030
+    user: "node"
+    working_dir: /home/node/app
+    volumes:
+      - ./:/home/node/app
+    environment:
+      - NODE_ENV=production
+    command: "npm start"
+    labels:
+      - "traefik.frontend.rule=Host:testing.gif"
+
+  graphicsmagick:
+    image: rafakato/alpine-graphicsmagick
+    restart: always
+    entrypoint: ["/usr/bin/gm"]
+
+
