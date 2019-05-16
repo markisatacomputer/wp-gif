@@ -13,14 +13,14 @@ module.exports = class Giffer {
     this.period = options.period ? options.period : 5
     this.start = options.start ? options.start : 0
     this.totalFrames = options.totalFrames ? options.totalFrames : 20
-    this.frequency = this.calcFrequency()
-    this.frame = 0
-    this.interval
     this.width = options.width ? options.width : 320
     this.height = options.height ? options.height: 240
     this.repeat = options.repeat ? options.repeat: 0
     this.delay = options.delay ? options.delay: 200
     this.frameUrlBase = options.url ? options.url : frameUrlBase
+    this.frequency = this.calcFrequency()
+    this.frame = 0
+    this.interval
     this.tmpDir = (process.env.tmpDir) ? process.env.tmpDir : './tmp'
     this.finishDir = (process.env.finishDir) ? process.env.finishDir : './finished'
     this.outputName = this.finishDir+'/animated-'+moment().valueOf()+'.gif'

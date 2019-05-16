@@ -13,6 +13,8 @@ services:
       - ./:/home/node/app
     environment:
       - NODE_ENV=production
+    env_file:
+      - .env
     command: "npm start"
     labels:
       - "traefik.frontend.rule=Host:testing.gif"
