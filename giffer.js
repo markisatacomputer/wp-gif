@@ -1,33 +1,15 @@
 const fs       = require('fs')
 const moment   = require('moment')
 const gif      = require('gifencoder')
-const Buffer   = require('buffer').Buffer
+const pngfs    = require('png-file-stream')
 const request  = require('request')
 const gm       = require('gm')
 
-const frameUrlBase = "https://qt.exploratorium.edu/roofcam/Observatory/image.jpg"
-
-//  See https://github.com/aheckmann/gm/issues/572
-function gmToBuffer (data) {
-  return new Promise((resolve, reject) => {
-    data.stream((err, stdout, stderr) => {
-      if (err) { return reject(err) }
-      const chunks = []
-      stdout.on('data', (chunk) => { chunks.push(chunk) })
-      // these are 'once' because they can and do fire multiple times for multiple errors,
-      // but this is a promise so you'll have to deal with them one at a time
-      stdout.once('end', () => { resolve(Buffer.concat(chunks)) })
-      stderr.once('data', (data) => { reject(String(data)) })
-    })
-  })
-}
+const frameUrlBase = (process.env.url) ? process.env.url : "https://qt.exploratorium.edu/roofcam/Observatory/image.jpg"
 
 module.exports = class Giffer {
 
   constructor (options) {
-    if (typeof(options.email) == 'string') this.email = options.email
-    else return new Error('email required.')
-
     this.period = options.period ? options.period : 5
     this.start = options.start ? options.start : 0
     this.totalFrames = options.totalFrames ? options.totalFrames : 20
@@ -36,23 +18,20 @@ module.exports = class Giffer {
     this.interval
     this.width = options.width ? options.width : 320
     this.height = options.height ? options.height: 240
+    this.repeat = options.repeat ? options.repeat: 0
+    this.delay = options.delay ? options.delay: 200
     this.frameUrlBase = options.url ? options.url : frameUrlBase
+    this.tmpDir = (process.env.tmpDir) ? process.env.tmpDir : './tmp'
+    this.finishDir = (process.env.finishDir) ? process.env.finishDir : './finished'
+    this.outputName = this.finishDir+'/animated-'+moment().valueOf()+'.gif'
   }
 
   init () {
-    var promised
-
-    //  create gif
-    this.animated = new gif(this.width, this.height)
-    this.animated.setRepeat(0)
-    this.animated.setDelay(333)
-    this.animated.createReadStream().pipe(fs.createWriteStream('./finished/animated-'+moment().valueOf()+'.gif'))
-    //this.animated.setOutputFile('./finished/animated-'+d+'.gif')
-    //this.animated.setTmpDir('./tmp')
-
-    //  add frames
-    promised = new Promise( (resolve, reject) => {
+    //  create frames
+    var promised = new Promise( (resolve, reject) => {
       var self = this
+      this.resolve = resolve
+      this.reject = reject
       this.getFrame()
       this.interval = setInterval(function () { self.getFrame() }, this.frequency)
     })
@@ -64,6 +43,7 @@ module.exports = class Giffer {
   handleErr (err) {
     if (typeof(this.interval) == 'Timeout') clearInterval(this.interval)
     console.log(err)
+    this.reject(err)
     return err
   }
 
@@ -81,36 +61,55 @@ module.exports = class Giffer {
   }
 
   getFrame () {
-    var self, frame, frameUrl, tmp
+    var self, frame, frameUrl, data
 
     this.frame++
-    console.log('Writing frame '+this.frame+' of '+this.totalFrames+' total frames.\n')
+    console.log('Writing frame '+this.frame+' of '+this.totalFrames+' total frames. -- '+this.outputName+'\n')
 
     frameUrl = this.frameUrlBase + "?t=" + Date.now()
-    //frame = request(frameUrl)
-    tmp = gm( request(frameUrl) ).resize(this.width)
-    gmToBuffer(tmp).then( (buffer) => {
-      //  add frame to animated
-      this.animated.addFrame(buffer)
-      //  finish
-      if (this.frame == this.totalFrames) {
-        clearInterval(this.interval)
-        this.animated.finish()
+    gm( request(frameUrl) ).resize(this.width).write(
+      './tmp/00'+this.frame+'.png',
+      (err) => {
+        if (err) this.handleErr(err)
+        if (this.frame == this.totalFrames) this.finish()
       }
-    }).catch((err) => {
-      this.handleErr(err)
-    })
-
+    )
   }
 
-  write () {
-    this.animated.encode((status, err) => {
-      if (status) console.log('animated gif successfully written to animated-async.gif')
-      else {
-        console.log('failed writing animated gif: ' + err)
-        throw err
+  finish () {
+    console.log('Finishing gif -- '+this.outputName+'.\n')
+
+    //  stop making frames
+    clearInterval(this.interval)
+
+    //  create gif from frames
+    gm(this.tmpDir+'/001.png').size( (err, size) => {
+      if (err) this.handleErr(err)
+      if (size) this.height = size.height
+      this.gif = new gif(this.width, this.height)
+      pngfs(this.tmpDir+'/*.png')
+        .pipe(this.gif.createWriteStream({repeat: this.repeat, delay: this.delay}))
+        .pipe(fs.createWriteStream(this.outputName))
+        .on('error', (err) => this.handleErr(err))
+        .on('finish', () => {
+          this.clean()
+          this.resolve(this.outputName)
+        })
+    })
+  }
+
+  clean () {
+    var path = this.tmpDir
+    fs.readdir(path, (err, files) => {
+      if (err) this.handleErr(err)
+
+      for (const file of files) {
+        fs.unlink(path+'/'+file, err => {
+          if (err) this.handleErr(err)
+        })
       }
     })
   }
+
 
 }

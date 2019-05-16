@@ -13,7 +13,9 @@ app.use(attach)
 app.get('*', (req, res) => (res.send('Hello there')) )
 
 app.post('/create', (req, res) => {
-  req.gif.init()
+  req.gif.init().then((path) => {
+    console.log('done! -- '+path)
+  })
   res.send('gif creation initiated.\n')
 })
 

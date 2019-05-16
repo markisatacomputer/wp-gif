@@ -3,7 +3,7 @@ version: '3'
 services:
 
   node:
-    image: node:10.15-alpine
+    build: ./
     restart: always
     ports:
       - 3030:3030
@@ -16,10 +16,3 @@ services:
     command: "npm start"
     labels:
       - "traefik.frontend.rule=Host:testing.gif"
-
-  graphicsmagick:
-    image: rafakato/alpine-graphicsmagick
-    restart: always
-    entrypoint: ["/usr/bin/gm"]
-
-
